@@ -21,12 +21,13 @@ train['purpose'].unique()
 train['bad_loans'].unique()
 train['inactive_loans'].unique()
 # bad_loans는 target
-# grade, purpose는 label encoder
+# grade, purpose는 label encoder, one-hot encoder
 # id, inactive_loans 는 버리기
 
 
 train.drop(['id', 'inactive_loans'], axis=1, inplace=True)
-# 또는 train = train.iloc[:,:8]
+# 또는 train = train.iloc[:,1:7]
+# .loc: label based indexing, .iloc: positional indexing
 
 enc = preprocessing.LabelEncoder()
 enc2 = preprocessing.LabelEncoder()
@@ -40,27 +41,22 @@ onehot1 = preprocessing.OneHotEncoder()
 onehot2 = preprocessing.OneHotEncoder()
 
 oh_grade = onehot1.fit_transform(np.array(train['grade']).reshape(-1, 1)).toarray()
-oh_purpose = onehot2.fit_transform(np.array(train['purpose']).reshape(-1,1)).toarray()
+oh_purpose = onehot2.fit_transform(np.array(train['purpose']).reshape(-1, 1)).toarray()
 
-oh_grade_df = pd.DataFrame(oh_grade, columns=['A','B','C','D','E','F','G'])
+oh_grade_df = pd.DataFrame(oh_grade, columns=['A', 'B', 'C', 'D', 'E', 'F', 'G'])
 oh_purpose_df = pd.DataFrame(oh_purpose)
 
 oh_grade_df.head()
 oh_purpose_df.head()
 
-train = pd.concat([train,oh_grade_df,oh_purpose_df], axis=1)
-train
+train = pd.concat([train, oh_grade_df, oh_purpose_df], axis=1)
 
-train.drop(['grade','purpose'],axis=1,inplace=True)
-train
+train.drop(['grade', 'purpose'], axis=1, inplace=True)
 
-train.drop(['A',0], axis=1, inplace=True)
-train
+train.drop(['A', 0], axis=1, inplace=True)
 
-# target을 지정하고 나머지는 feature
-y = np.array(train['bad_loans'])  # index가 없게
 X = train.drop('bad_loans', axis=1)
-# .loc: label based indexing, .iloc: positional indexing
+y = np.array(train['bad_loans'])  # index가 없게
 
 # train, test set 8:2로 나누기.
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,
@@ -70,7 +66,7 @@ scaler = MinMaxScaler(feature_range=(0.0, 1.0))
 X_train = scaler.fit_transform(X_train)  # train set에 fitting & transform
 X_test = scaler.transform(X_test)  # fitting 된 scaler 로 transform
 
-model = MLPClassifier(hidden_layer_sizes=(500, 500, 100),
+model = MLPClassifier(hidden_layer_sizes=(50, 50, 100),
                       activation='relu', solver='adam', alpha=1e-5,
                       batch_size='auto', learning_rate='constant',
                       learning_rate_init=0.0001,
@@ -107,7 +103,6 @@ b = np.where(probs[:, 1] < threshold, 0, 1)
 
 accuracy = metrics.accuracy_score(y_test, predictions)
 accuracy
-
 accuracy = metrics.accuracy_score(y_test, threshold_preds)
 accuracy
 accuracy = metrics.accuracy_score(y_test, a)
@@ -115,28 +110,39 @@ accuracy
 accuracy = metrics.accuracy_score(y_test, b)
 accuracy
 
-
-
-
-
-print("The model has {0}% accuracy.".format(accuracy * 100))
-
-print(metrics.classification_report(y_test, a))
+print("The model has {}% accuracy.".format(accuracy * 100))
 
 metrics.confusion_matrix(y_test, a)
+print(metrics.classification_report(y_test, a))
+print(metrics.classification_report(y_test, predictions))
+
+from sklearn.metrics import roc_curve, auc
+
+fpr, tpr, cutoff = roc_curve(y_test, model.predict_proba(X_test)[:, 1])
+auc(fpr, tpr)
+
+import matplotlib.pyplot as plt
+
+plt.figure()  # 그래프 한 장 그릴거다.
+plt.plot(fpr, tpr, label='model 1')  # roc curve
+plt.plot([0, 1], [0, 1], 'k--')  # 45도 점선
+plt.xlim([0.0, 1.0])  # x축 제한
+plt.ylim([0.0, 1.05])  # y축 제한
+plt.xlabel('False Positive Rate')  # x축 이름
+plt.ylabel('True Positive Rate')  # y축 이름
+plt.title('ROC curve')  # 그래프 제목
+plt.legend(loc="lower right")  # 범주 표시. loc: 위치
+plt.show()  # 그린 거 보여달라.
 
 
 def loanclassifierfull(_arg1, _arg2, _arg3, _arg4, _arg5):
-    from pandas import DataFrame
+    import pandas as pd
 
-    # 태블로에서 list로 받으면서 dictionary로 저장
-    # 알파벳 순으로 정렬되니 순서대로 되도록 column 명에 숫자 붙임.
     d = {'1-grade': _arg1, '2-income': _arg2,
          '3-sub_grade_num': _arg3, '4-purpose': _arg4, '5-dti': _arg5}
-
-    df = DataFrame(data=d)  # dataframe 에 저장
-
-    # train set 에서 fit 했던 enc, enc2, scaler.
+    print(d)
+    df = pd.DataFrame(data=d)
+    print(df)
     df['1-grade'] = enc.transform(df['1-grade'])
     df['4-purpose'] = enc2.transform(df['4-purpose'])
 
@@ -145,13 +151,14 @@ def loanclassifierfull(_arg1, _arg2, _arg3, _arg4, _arg5):
 
     new_grade_df = pd.DataFrame(new_grade, columns=['A', 'B', 'C', 'D', 'E', 'F', 'G'])
     new_purpose_df = pd.DataFrame(new_purpose)
+
     df = pd.concat([df, new_grade_df, new_purpose_df], axis=1)
+
     df.drop(['1-grade', '4-purpose'], axis=1, inplace=True)
     df.drop(['A', 0], axis=1, inplace=True)
 
     df = scaler.transform(df)
 
-    # train set으로 만든 모델로 예측
     probs = model.predict_proba(df)
     return probs[:, 1].tolist()
 

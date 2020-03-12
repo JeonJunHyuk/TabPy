@@ -3,10 +3,10 @@ def PCA(_arg1, _arg2, *_argN):
     import pandas as pd
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
-
     cols = [_arg2] + list(_argN)
+    print(cols)
     df = pd.DataFrame(data=cols).transpose()
-
+    print(df.head())
     scale = StandardScaler()
     dat = scale.fit_transform(df)
 
